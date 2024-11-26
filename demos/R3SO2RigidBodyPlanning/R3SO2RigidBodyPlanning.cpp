@@ -17,23 +17,58 @@
 
 using namespace ompl;
 
-void printIntPath(const geometric::PathGeometric &path, const base::StateSpacePtr &space, int numPoints = 300) {
+bool printIntPath(const geometric::PathGeometric &path, const base::SpaceInformationPtr &si, const std::string &filename, double resolution) {
 	geometric::PathGeometric geometricPath(path);
 
-	geometricPath.interpolate(numPoints);
+	geometricPath.interpolate(2500);
+
+	std::ofstream file(filename);
+	if (!file.is_open()) {
+		std::cerr << "Failed to open file: " << filename << std::endl;
+		return false;
+	}
 
 	// Print the interpolated path in matrix form
-    std::cout << "\nInterpolated Solution Path:\n";
+    file << "Interpolated Solution Path:\n";
+
+    bool valid = true;
     for (size_t i = 0; i < geometricPath.getStateCount(); ++i)
     {
         const base::State *state = geometricPath.getState(i);
+
+		if (!si->isValid(state)) {
+			std::cout << "INVALID STATE COMPUTED AT INDEX: " << i << std::endl;
+			valid = false;
+			continue;
+		}
+        
         const auto *compoundState = state->as<base::CompoundState>();
         const auto *r3State = compoundState->as<base::RealVectorStateSpace::StateType>(0);
         const auto *so2State = compoundState->as<base::SO2StateSpace::StateType>(1);
 
         // Print the state in "x y z yaw" format
-        std::cout << r3State->values[0] << " " << r3State->values[1] << " " << r3State->values[2] << " " << so2State->value << "\n";
+        file << r3State->values[0] << " " << r3State->values[1] << " " << r3State->values[2] << " " << so2State->value << "\n";
     }
+
+    if (valid) {
+    	std::cout << "Interpolated path is valid.\n";
+    } else {
+    	std::cerr << "Interpolated path contains invalid states.\n";
+    }
+
+    file.close();
+    return valid;
+}
+
+bool validCheck(const geometric::PathGeometric &path, const base::SpaceInformationPtr &si) {
+	for (size_t i = 0; i < path.getStateCount(); ++i) {
+		if (!si->isValid(path.getState(i))) {
+			std::cerr << "INVALID STATE FOUND IN PATH\n";
+			return false;
+		}
+	}
+
+	return true;
 }
 
 int main(int argc, char **argv)
@@ -112,20 +147,47 @@ int main(int argc, char **argv)
     setup.setPlanner(std::make_shared<geometric::PRM>(setup.getSpaceInformation()));
 
     // setting collision checking resolution to 1% of the space extent
-    setup.getSpaceInformation()->setStateValidityCheckingResolution(1e-6);
+	double resolution = 0.00888888; // thickness of the robot's arm
+	setup.getSpaceInformation()->setStateValidityCheckingResolution(resolution);
 
-    // we call setup just so print() can show more information
+	// we call setup just so print() can show more information
     setup.setup();
     setup.print();
 
-    // try to solve the problem
-    if (setup.solve(1e6))
-    {
-        // simplify & print the solution
-		// setup.simplifySolution();
-        setup.getSolutionPath().printAsMatrix(std::cout);
-        printIntPath(setup.getSolutionPath(), setup.getStateSpace());
-    }
+	bool solutionFound = false;
+	while (!solutionFound && resolution > 1e-8) {
+		std::cout << "Trying resolution: " << resolution << std::endl;
+
+		setup.getSpaceInformation()->setStateValidityCheckingResolution(resolution);
+		setup.getPlanner()->clear();
+		
+		if (setup.solve(1e6)) {
+			std::cout << "Original path: " << std::endl;
+			setup.getSolutionPath().printAsMatrix(std::cout);
+			geometric::PathGeometric path = setup.getSolutionPath();
+
+			if (validCheck(path, setup.getSpaceInformation())) {
+				std::cout << "Original path is valid.\n";
+				if (printIntPath(path, setup.getSpaceInformation(), "TESTPATH.txt", resolution)) {
+					std::cout << "Final interpolated path is valid.\n";
+					solutionFound = true;
+				} else {
+					std::cerr << "Interpolated path is invalid. Refining resolution and retrying...\n";
+					resolution /= 2;
+				}
+			} else {
+				std::cerr << "Original path invalid. Refining resolution and retrying...\n";
+				resolution /= 2;
+			}
+		} else {
+			std::cerr << "No solution found at resolution: " << resolution << std::endl;
+			resolution /= 2;
+		}
+	}
+
+	if (!solutionFound) {
+		std::cerr << "Failed to find a valid solution even after refining resolution.\n";
+	}
 
     return 0;
 }
