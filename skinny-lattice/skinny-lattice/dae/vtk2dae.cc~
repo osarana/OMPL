@@ -1,0 +1,10 @@
+#include <iostream>
+using namespace std;
+
+int main (int argc, char *argv[]) {
+  string s;
+  while (cin >> s && !s.equals("POINTS"));
+  int npoints;
+  cin >> npoints;
+  cout << "npoints " << npoints << endl;
+}
