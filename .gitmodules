@@ -1,0 +1,4 @@
+[submodule "ompl"]
+	path = ompl
+	url = git@github.com:joemasterjohn/ompl.git
+	branch = 4_dof_rigid_body
