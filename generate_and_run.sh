@@ -12,7 +12,7 @@ SCALE="$1"
 ROOT_DIR="$(pwd)"
 DAE_DIR="$ROOT_DIR/skinny-lattice/skinny-lattice/dae"
 BIN_DIR="$ROOT_DIR/build/Release/bin"
-PLUS_VTK="$DAE_DIR/plus.vtk"
+PLUS_VTK="$DAE_DIR/plus2.vtk"
 WORLD_DAE="$DAE_DIR/lattice-room.dae"
 DEMO_BIN="$BIN_DIR/demo_R3SO2RigidBodyPlanning"
 
